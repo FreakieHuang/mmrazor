@@ -48,7 +48,8 @@ find_unused_parameters = True
 val_cfg = dict(_delete_=True, type='mmrazor.SingleTeacherDistillValLoop')
 
 # change `CIFAR10` dataset to `CRD_CIFAR10` dataset.
-dataset_type = 'CRD_CIFAR10'
+dataset_type = 'CRD_ClsDataset'
+ori_dataset_type = 'CIFAR10'
 train_pipeline = [
     dict(_scope_='mmcls', type='RandomCrop', crop_size=32, padding=4),
     dict(_scope_='mmcls', type='RandomFlip', prob=0.5, direction='horizontal'),
@@ -66,9 +67,12 @@ train_dataloader = dict(
     dataset=dict(
         _scope_='mmrazor',
         type=dataset_type,
-        data_prefix='data/cifar10',
-        test_mode=False,
-        pipeline=train_pipeline),
+        dataset=dict(
+            _scope_='mmcls',
+            type=ori_dataset_type,
+            data_prefix='data/cifar10',
+            test_mode=False,
+            pipeline=train_pipeline)),
     sampler=dict(type='DefaultSampler', shuffle=True),
     persistent_workers=True,
 )
@@ -80,9 +84,12 @@ val_dataloader = dict(
     dataset=dict(
         _scope_='mmrazor',
         type=dataset_type,
-        data_prefix='data/cifar10/',
-        test_mode=True,
-        pipeline=test_pipeline),
+        dataset=dict(
+            _scope_='mmcls',
+            type=ori_dataset_type,
+            data_prefix='data/cifar10',
+            test_mode=False,
+            pipeline=test_pipeline)),
     sampler=dict(type='DefaultSampler', shuffle=False),
     persistent_workers=True,
 )
