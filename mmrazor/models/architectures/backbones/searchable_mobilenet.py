@@ -2,14 +2,20 @@
 import copy
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 
-from mmcls.models.backbones.base_backbone import BaseBackbone
-from mmcls.models.utils import make_divisible
 from mmcv.cnn import ConvModule
-from mmcv.runner import Sequential
+from mmengine.model import Sequential
 from torch import Tensor
 from torch.nn.modules.batchnorm import _BatchNorm
 
 from mmrazor.registry import MODELS
+
+try:
+    from mmcls.models.backbones.base_backbone import BaseBackbone
+    from mmcls.models.utils import make_divisible
+except ImportError:
+    from mmrazor.utils import get_placeholder
+    BaseBackbone = get_placeholder('mmcls')
+    make_divisible = get_placeholder('mmcls')
 
 
 @MODELS.register_module()
@@ -166,7 +172,7 @@ class SearchableMobileNet(BaseBackbone):
             mutable_cfg (dict): Config of mutable.
 
         Returns:
-            mmcv.runner.Sequential: The layer made.
+            mmengine.model.Sequential: The layer made.
         """
         layers = []
         for i in range(num_blocks):

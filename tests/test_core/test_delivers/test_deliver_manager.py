@@ -1,9 +1,9 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from unittest import TestCase
 
-from mmcv import ConfigDict
+from mmengine import ConfigDict
 
-from mmrazor.structures import DistillDeliveryManager
+from mmrazor.models.task_modules import DistillDeliveryManager
 
 
 class TestDeliverManager(TestCase):

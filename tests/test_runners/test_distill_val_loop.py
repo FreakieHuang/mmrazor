@@ -13,7 +13,8 @@ from mmengine.model import BaseModel
 from mmengine.runner import Runner
 from torch.utils.data import Dataset
 
-from mmrazor.engine import SingleTeacherDistillValLoop  # noqa: F401
+from mmrazor.engine import SelfDistillValLoop  # noqa: F401
+from mmrazor.engine import SingleTeacherDistillValLoop
 from mmrazor.registry import DATASETS, METRICS, MODELS
 
 
@@ -26,9 +27,10 @@ class ToyModel_DistillValLoop(BaseModel):
         self.linear2 = nn.Linear(2, 1)
         self.teacher = MagicMock()
 
-    def forward(self, batch_inputs, labels, mode='tensor'):
-        labels = torch.stack(labels)
-        outputs = self.linear1(batch_inputs)
+    def forward(self, inputs, data_samples, mode='tensor'):
+        inputs = torch.stack(inputs)
+        labels = torch.stack(data_samples)
+        outputs = self.linear1(inputs)
         outputs = self.linear2(outputs)
 
         if mode == 'tensor':
@@ -56,7 +58,7 @@ class ToyDataset_DistillValLoop(Dataset):
         return self.data.size(0)
 
     def __getitem__(self, index):
-        return dict(inputs=self.data[index], data_sample=self.label[index])
+        return dict(inputs=self.data[index], data_samples=self.label[index])
 
 
 @METRICS.register_module()
@@ -125,3 +127,54 @@ class TestSingleTeacherDistillValLoop(TestCase):
         runner.val()
 
         self.assertIn('val/teacher.acc', runner.message_hub.log_scalars.keys())
+
+
+class TestSelfDistillValLoop(TestCase):
+
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp()
+
+        val_dataloader = dict(
+            dataset=dict(type='ToyDataset_DistillValLoop'),
+            sampler=dict(type='DefaultSampler', shuffle=False),
+            batch_size=3,
+            num_workers=0)
+        val_evaluator = dict(type='ToyMetric_DistillValLoop')
+
+        val_loop_cfg = dict(
+            default_scope='mmrazor',
+            model=dict(type='ToyModel_DistillValLoop'),
+            work_dir=self.temp_dir,
+            val_dataloader=val_dataloader,
+            val_evaluator=val_evaluator,
+            val_cfg=dict(type='SelfDistillValLoop'),
+            custom_hooks=[],
+            default_hooks=dict(
+                runtime_info=dict(type='RuntimeInfoHook'),
+                timer=dict(type='IterTimerHook'),
+                logger=dict(type='LoggerHook'),
+                param_scheduler=dict(type='ParamSchedulerHook'),
+                checkpoint=dict(
+                    type='CheckpointHook', interval=1, by_epoch=True),
+                sampler_seed=dict(type='DistSamplerSeedHook')),
+            launcher='none',
+            env_cfg=dict(dist_cfg=dict(backend='nccl')),
+        )
+        self.val_loop_cfg = Config(val_loop_cfg)
+
+    def tearDown(self):
+        shutil.rmtree(self.temp_dir)
+
+    def test_init(self):
+        cfg = copy.deepcopy(self.val_loop_cfg)
+        cfg.experiment_name = 'test_init_self'
+        runner = Runner.from_cfg(cfg)
+        loop = runner.build_val_loop(cfg.val_cfg)
+
+        self.assertIsInstance(loop, SelfDistillValLoop)
+
+    def test_run(self):
+        cfg = copy.deepcopy(self.val_loop_cfg)
+        cfg.experiment_name = 'test_run_self'
+        runner = Runner.from_cfg(cfg)
+        runner.val()

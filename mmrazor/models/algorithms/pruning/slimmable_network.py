@@ -4,11 +4,11 @@ import os
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
-import mmcv
 import torch
-from mmengine import BaseDataElement
+from mmengine import fileio
 from mmengine.model import BaseModel, MMDistributedDataParallel
 from mmengine.optim import OptimWrapper
+from mmengine.structures import BaseDataElement
 from torch import nn
 
 from mmrazor.models.mutators import SlimmableChannelMutator
@@ -86,7 +86,7 @@ class SlimmableNetwork(BaseAlgorithm):
         """Load and merge channel config."""
         channel_cfgs = list()
         for channel_cfg_path in channel_cfg_paths:
-            channel_cfg = mmcv.fileio.load(channel_cfg_path)
+            channel_cfg = fileio.load(channel_cfg_path)
             channel_cfgs.append(channel_cfg)
 
         return self.merge_channel_cfgs(channel_cfgs)

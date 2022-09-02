@@ -94,9 +94,48 @@ class SingleTeacherDistillValLoop(ValLoop):
             # outputs should be sequence of BaseDataElement
             outputs = self.teacher.val_step(data_batch)
 
-        self.evaluator.process(data_batch, outputs)
+        self.evaluator.process(data_samples=outputs, data_batch=data_batch)
         self.runner.call_hook(
             'after_val_iter',
             batch_idx=idx,
             data_batch=data_batch,
             outputs=outputs)
+
+
+@LOOPS.register_module()
+class SelfDistillValLoop(ValLoop):
+    """Knowledge Distill loop for validation. Only validate student.
+
+    Args:
+        runner (Runner): A reference of runner.
+        dataloader (Dataloader or dict): A dataloader object or a dict to
+            build a dataloader.
+        evaluator (Evaluator or dict or list): Used for computing metrics.
+        fp16 (bool): Whether to enable fp16 validation. Defaults to
+            False.
+    """
+
+    def __init__(self,
+                 runner,
+                 dataloader: Union[DataLoader, Dict],
+                 evaluator: Union[Evaluator, Dict, List],
+                 fp16: bool = False) -> None:
+        super().__init__(runner, dataloader, evaluator, fp16)
+
+    def run(self):
+        """Launch validation."""
+        self.runner.call_hook('before_val')
+        self.runner.call_hook('before_val_epoch')
+        self.runner.model.eval()
+
+        for idx, data_batch in enumerate(self.dataloader):
+            self.run_iter(idx, data_batch)
+        # compute student metrics
+        metrics = self.evaluator.evaluate(len(self.dataloader.dataset))
+        student_metrics = dict()
+        for key, value in metrics.items():
+            student_key = 'student.' + key
+            student_metrics[student_key] = value
+
+        self.runner.call_hook('after_val_epoch', metrics=student_metrics)
+        self.runner.call_hook('after_val')

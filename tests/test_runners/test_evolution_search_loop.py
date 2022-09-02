@@ -6,8 +6,9 @@ import tempfile
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
-import mmcv
 import torch
+import torch.nn as nn
+from mmengine import fileio
 from mmengine.config import Config
 from torch.utils.data import DataLoader, Dataset
 
@@ -55,7 +56,7 @@ class ToyRunner:
         pass
 
     def model(self):
-        pass
+        return nn.Conv2d
 
     def logger(self):
         pass
@@ -104,14 +105,16 @@ class TestEvolutionSearchLoop(TestCase):
         fake_subnet = {'1': 'choice1', '2': 'choice2'}
         fake_candidates = Candidates((fake_subnet, 0.))
         init_candidates_path = os.path.join(self.temp_dir, 'candidates.yaml')
-        mmcv.fileio.dump(fake_candidates, init_candidates_path)
+        fileio.dump(fake_candidates, init_candidates_path)
         loop_cfg.init_candidates = init_candidates_path
         loop = LOOPS.build(loop_cfg)
         self.assertIsInstance(loop, EvolutionSearchLoop)
         self.assertEqual(loop.candidates, fake_candidates)
 
     @patch('mmrazor.engine.runner.evolution_search_loop.export_fix_subnet')
-    @patch('mmrazor.structures.FlopsEstimator.get_model_complexity_info')
+    @patch(
+        'mmrazor.engine.runner.evolution_search_loop.get_model_complexity_info'
+    )
     def test_run_epoch(self, mock_flops, mock_export_fix_subnet):
         # test_run_epoch: distributed == False
         loop_cfg = copy.deepcopy(self.train_cfg)
@@ -120,7 +123,7 @@ class TestEvolutionSearchLoop(TestCase):
         loop_cfg.evaluator = self.evaluator
         loop = LOOPS.build(loop_cfg)
         self.runner.rank = 0
-        self.runner.epoch = 1
+        loop._epoch = 1
         self.runner.distributed = False
         self.runner.work_dir = self.temp_dir
         fake_subnet = {'1': 'choice1', '2': 'choice2'}
@@ -128,12 +131,12 @@ class TestEvolutionSearchLoop(TestCase):
         loop.run_epoch()
         self.assertEqual(len(loop.candidates), 4)
         self.assertEqual(len(loop.top_k_candidates), 2)
-        self.assertEqual(self.runner.epoch, 2)
+        self.assertEqual(loop._epoch, 2)
 
         # test_run_epoch: distributed == True
         loop = LOOPS.build(loop_cfg)
         self.runner.rank = 0
-        self.runner.epoch = 1
+        loop._epoch = 1
         self.runner.distributed = True
         self.runner.work_dir = self.temp_dir
         fake_subnet = {'1': 'choice1', '2': 'choice2'}
@@ -141,13 +144,13 @@ class TestEvolutionSearchLoop(TestCase):
         loop.run_epoch()
         self.assertEqual(len(loop.candidates), 4)
         self.assertEqual(len(loop.top_k_candidates), 2)
-        self.assertEqual(self.runner.epoch, 2)
+        self.assertEqual(loop._epoch, 2)
 
         # test_check_constraints
         loop_cfg.flops_range = (0, 100)
         loop = LOOPS.build(loop_cfg)
         self.runner.rank = 0
-        self.runner.epoch = 1
+        loop._epoch = 1
         self.runner.distributed = True
         self.runner.work_dir = self.temp_dir
         fake_subnet = {'1': 'choice1', '2': 'choice2'}
@@ -157,7 +160,7 @@ class TestEvolutionSearchLoop(TestCase):
         loop.run_epoch()
         self.assertEqual(len(loop.candidates), 4)
         self.assertEqual(len(loop.top_k_candidates), 2)
-        self.assertEqual(self.runner.epoch, 2)
+        self.assertEqual(loop._epoch, 2)
 
     @patch('mmrazor.engine.runner.evolution_search_loop.export_fix_subnet')
     def test_run(self, mock_export_fix_subnet):
@@ -168,12 +171,11 @@ class TestEvolutionSearchLoop(TestCase):
         loop_cfg.evaluator = self.evaluator
         loop = LOOPS.build(loop_cfg)
         self.runner.rank = 0
-        self.runner.epoch = 1
+        loop._epoch = 1
         fake_subnet = {'1': 'choice1', '2': 'choice2'}
         self.runner.work_dir = self.temp_dir
         loop.update_candidate_pool = MagicMock()
         loop.val_candidate_pool = MagicMock()
-        fake_subnet = {'1': 'choice1', '2': 'choice2'}
         loop.gen_mutation_candidates = \
             MagicMock(return_value=[fake_subnet]*loop.num_mutation)
         loop.gen_crossover_candidates = \
@@ -184,14 +186,14 @@ class TestEvolutionSearchLoop(TestCase):
         loop.run()
         assert os.path.exists(
             os.path.join(self.temp_dir, 'best_fix_subnet.yaml'))
-        self.assertEqual(loop.runner.epoch, loop.max_epochs)
+        self.assertEqual(loop._epoch, loop._max_epochs)
         assert os.path.exists(
             os.path.join(self.temp_dir,
-                         f'search_epoch_{loop.max_epochs-1}.pkl'))
+                         f'search_epoch_{loop._max_epochs-1}.pkl'))
         # test resuming search
         loop_cfg.resume_from = os.path.join(
-            self.temp_dir, f'search_epoch_{loop.max_epochs-1}.pkl')
+            self.temp_dir, f'search_epoch_{loop._max_epochs-1}.pkl')
         loop = LOOPS.build(loop_cfg)
         self.runner.rank = 0
         loop.run()
-        self.assertEqual(loop.max_epochs, 1)
+        self.assertEqual(loop._max_epochs, 1)

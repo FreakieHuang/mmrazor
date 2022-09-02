@@ -28,8 +28,9 @@ class ToyModel_GreedySamplerTrainLoop(BaseModel):
         self.linear2 = nn.Linear(2, 1)
         self.mutator = mock_mutator
 
-    def forward(self, batch_inputs, labels, mode='tensor'):
-        labels = torch.stack(labels)
+    def forward(self, inputs, data_samples, mode='tensor'):
+        batch_inputs = torch.stack(inputs)
+        labels = torch.stack(data_samples)
         outputs = self.linear1(batch_inputs)
         outputs = self.linear2(outputs)
 
@@ -67,7 +68,7 @@ class ToyDataset_GreedySamplerTrainLoop(Dataset):
         return self.data.size(0)
 
     def __getitem__(self, index):
-        return dict(inputs=self.data[index], data_sample=self.label[index])
+        return dict(inputs=self.data[index], data_samples=self.label[index])
 
 
 @METRICS.register_module()
@@ -192,7 +193,8 @@ class TestGreedySamplerTrainLoop(TestCase):
         self.assertEqual(len(loop.top_k_candidates), loop.top_k - 1)
 
     @patch('mmrazor.engine.runner.subnet_sampler_loop.export_fix_subnet')
-    @patch('mmrazor.structures.FlopsEstimator.get_model_complexity_info')
+    @patch(
+        'mmrazor.engine.runner.subnet_sampler_loop.get_model_complexity_info')
     def test_run(self, mock_flops, mock_export_fix_subnet):
         # test run with flops_range=None
         cfg = copy.deepcopy(self.iter_based_cfg)

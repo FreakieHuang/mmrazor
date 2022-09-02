@@ -2,11 +2,11 @@
 from unittest import TestCase
 
 import torch
-from mmcv import ConfigDict
+from mmengine import ConfigDict
 from torch import nn
 from toy_mod import Toy
 
-from mmrazor.structures import RecorderManager
+from mmrazor.models.task_modules import RecorderManager
 
 
 class ToyModel(nn.Module):

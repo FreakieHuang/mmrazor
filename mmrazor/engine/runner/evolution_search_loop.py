@@ -1,20 +1,22 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import copy
 import os
 import os.path as osp
 import random
 import warnings
 from typing import Dict, List, Optional, Tuple, Union
 
-import mmcv
 import torch
+from mmengine import fileio
 from mmengine.dist import broadcast_object_list
 from mmengine.evaluator import Evaluator
 from mmengine.runner import EpochBasedTrainLoop
 from mmengine.utils import is_list_of
 from torch.utils.data import DataLoader
 
+from mmrazor.models.task_modules.estimators import get_model_complexity_info
 from mmrazor.registry import LOOPS
-from mmrazor.structures import Candidates, FlopsEstimator, export_fix_subnet
+from mmrazor.structures import Candidates, export_fix_subnet, load_fix_subnet
 from mmrazor.utils import SupportRandomSubnet
 from .utils import crossover
 
@@ -42,6 +44,8 @@ class EvolutionSearchLoop(EpochBasedTrainLoop):
         mutate_prob (float): The probability of mutation. Defaults to 0.1.
         flops_range (tuple, optional): flops_range to be used for screening
             candidates.
+        spec_modules (list): Used for specify modules need to counter.
+            Defaults to list().
         score_key (str): Specify one metric in evaluation results to score
             candidates. Defaults to 'accuracy_top-1'.
         init_candidates (str, optional): The candidates file path, which is
@@ -62,7 +66,8 @@ class EvolutionSearchLoop(EpochBasedTrainLoop):
                  num_crossover: int = 25,
                  mutate_prob: float = 0.1,
                  flops_range: Optional[Tuple[float, float]] = (0., 330 * 1e6),
-                 score_key: str = 'accuracy_top-1',
+                 spec_modules: List = [],
+                 score_key: str = 'accuracy/top1',
                  init_candidates: Optional[str] = None) -> None:
         super().__init__(runner, dataloader, max_epochs)
         if isinstance(evaluator, dict) or is_list_of(evaluator, dict):
@@ -80,6 +85,7 @@ class EvolutionSearchLoop(EpochBasedTrainLoop):
         self.num_candidates = num_candidates
         self.top_k = top_k
         self.flops_range = flops_range
+        self.spec_modules = spec_modules
         self.score_key = score_key
         self.num_mutation = num_mutation
         self.num_crossover = num_crossover
@@ -90,7 +96,7 @@ class EvolutionSearchLoop(EpochBasedTrainLoop):
         if init_candidates is None:
             self.candidates = Candidates()
         else:
-            self.candidates = mmcv.fileio.load(init_candidates)
+            self.candidates = fileio.load(init_candidates)
             assert isinstance(self.candidates, Candidates), 'please use the \
                 correct init candidates file'
 
@@ -108,7 +114,7 @@ class EvolutionSearchLoop(EpochBasedTrainLoop):
         if self.resume_from:
             self._resume()
 
-        while self.runner.epoch < self.max_epochs:
+        while self._epoch < self._max_epochs:
             self.run_epoch()
             self._save_searcher_ckpt()
 
@@ -150,7 +156,7 @@ class EvolutionSearchLoop(EpochBasedTrainLoop):
             crossover should be no more than the number of candidates.'
 
         self.candidates = Candidates(candidates)
-        self.runner.epoch += 1
+        self._epoch += 1
 
     def sample_candidates(self) -> None:
         """Update candidate pool contains specified number of candicates."""
@@ -172,10 +178,9 @@ class EvolutionSearchLoop(EpochBasedTrainLoop):
             metrics = self._val_candidate()
             score = metrics[self.score_key] \
                 if len(metrics) != 0 else 0.
-            # score = 0.
             self.candidates.set_score(i, score)
             self.runner.logger.info(
-                f'Epoch:[{self.runner.epoch}/{self.max_epochs}] '
+                f'Epoch:[{self._epoch}/{self._max_epochs}] '
                 f'Candidate:[{i + 1}/{self.num_candidates}] '
                 f'Score:{score}')
 
@@ -228,11 +233,11 @@ class EvolutionSearchLoop(EpochBasedTrainLoop):
     def _resume(self):
         """Resume searching."""
         if self.runner.rank == 0:
-            searcher_resume = mmcv.fileio.load(self.resume_from)
+            searcher_resume = fileio.load(self.resume_from)
             for k in searcher_resume.keys():
                 setattr(self, k, searcher_resume[k])
             epoch_start = int(searcher_resume['_epoch'])
-            self._max_epochs = self.max_epochs - epoch_start
+            self._max_epochs = self._max_epochs - epoch_start
             self.runner.logger.info('#' * 100)
             self.runner.logger.info(f'Resume from epoch: {epoch_start}')
             self.runner.logger.info('#' * 100)
@@ -244,8 +249,8 @@ class EvolutionSearchLoop(EpochBasedTrainLoop):
             self.model.set_subnet(best_random_subnet)
             best_fix_subnet = export_fix_subnet(self.model)
             save_name = 'best_fix_subnet.yaml'
-            mmcv.fileio.dump(best_fix_subnet,
-                             osp.join(self.runner.work_dir, save_name))
+            fileio.dump(best_fix_subnet,
+                        osp.join(self.runner.work_dir, save_name))
             self.runner.logger.info(
                 'Search finished and '
                 f'{save_name} saved in {self.runner.work_dir}.')
@@ -256,7 +261,7 @@ class EvolutionSearchLoop(EpochBasedTrainLoop):
         self.runner.model.eval()
         for data_batch in self.dataloader:
             outputs = self.runner.model.val_step(data_batch)
-            self.evaluator.process(data_batch, outputs)
+            self.evaluator.process(data_samples=outputs, data_batch=data_batch)
         metrics = self.evaluator.evaluate(len(self.dataloader.dataset))
         return metrics
 
@@ -268,19 +273,19 @@ class EvolutionSearchLoop(EpochBasedTrainLoop):
         """
         if self.runner.rank == 0:
             save_for_resume = dict()
-            save_for_resume['_epoch'] = self.runner.epoch
+            save_for_resume['_epoch'] = self._epoch
             for k in ['candidates', 'top_k_candidates']:
                 save_for_resume[k] = getattr(self, k)
-            mmcv.fileio.dump(
+            fileio.dump(
                 save_for_resume,
                 osp.join(self.runner.work_dir,
-                         f'search_epoch_{self.runner.epoch}.pkl'))
+                         f'search_epoch_{self._epoch}.pkl'))
             self.runner.logger.info(
-                f'Epoch:[{self.runner.epoch}/{self.max_epochs}], top1_score: '
+                f'Epoch:[{self._epoch}/{self._max_epochs}], top1_score: '
                 f'{self.top_k_candidates.scores[0]}')
 
             if self.max_keep_ckpts > 0:
-                cur_ckpt = self.runner.epoch + 1
+                cur_ckpt = self._epoch + 1
                 redundant_ckpts = range(1, cur_ckpt - self.max_keep_ckpts)
                 for _step in redundant_ckpts:
                     ckpt_path = osp.join(self.runner.work_dir,
@@ -299,9 +304,12 @@ class EvolutionSearchLoop(EpochBasedTrainLoop):
 
         self.model.set_subnet(random_subnet)
         fix_mutable = export_fix_subnet(self.model)
-        flops: float = FlopsEstimator.get_model_complexity_info(
-            self.model, fix_mutable=fix_mutable, as_strings=False)[0]
-        if self.flops_range[0] < flops < self.flops_range[1]:
+        copied_model = copy.deepcopy(self.model)
+        load_fix_subnet(copied_model, fix_mutable)
+        flops, _ = get_model_complexity_info(
+            copied_model, spec_modules=self.spec_modules)
+
+        if self.flops_range[0] <= flops <= self.flops_range[1]:
             return True
         else:
             return False
