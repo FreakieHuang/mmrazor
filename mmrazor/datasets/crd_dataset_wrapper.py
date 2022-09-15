@@ -168,7 +168,7 @@ class CRDDataset:
             data_info = self._get_contrast_info(data_info, idx)
         return data_info
 
-    def prepare_data(self, idx) -> Any:
+    def prepare_data(self, idx: int) -> Any:
         """Get data processed by ``self.pipeline``.
 
         Args:

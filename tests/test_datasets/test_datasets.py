@@ -14,8 +14,9 @@ register_all_modules()
 ASSETS_ROOT = osp.abspath(osp.join(osp.dirname(__file__), '../data/dataset'))
 
 
-class Test_CRD_CIFAR10(TestCase):
-    DATASET_TYPE = 'CRD_CIFAR10'
+class Test_CRDDataset(TestCase):
+    ORI_DATASET_TYPE = 'mmcls.CIFAR10'
+    DATASET_TYPE = 'CRDDataset'
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -27,8 +28,8 @@ class Test_CRD_CIFAR10(TestCase):
         cls.DEFAULT_ARGS = dict(
             data_prefix=data_prefix, pipeline=[], test_mode=False)
 
-        dataset_class = DATASETS.get(cls.DATASET_TYPE)
-        base_folder = osp.join(data_prefix, dataset_class.base_folder)
+        ori_dataset_class = DATASETS.get(cls.ORI_DATASET_TYPE)
+        base_folder = osp.join(data_prefix, ori_dataset_class.base_folder)
         os.mkdir(base_folder)
 
         cls.fake_imgs = np.random.randint(
@@ -51,22 +52,24 @@ class Test_CRD_CIFAR10(TestCase):
         with open(osp.join(base_folder, 'test_batch'), 'wb') as f:
             f.write(pickle.dumps(test_batch))
 
-        meta = {dataset_class.meta['key']: cls.fake_classes}
-        meta_filename = dataset_class.meta['filename']
+        meta = {ori_dataset_class.meta['key']: cls.fake_classes}
+        meta_filename = ori_dataset_class.meta['filename']
         with open(osp.join(base_folder, meta_filename), 'wb') as f:
             f.write(pickle.dumps(meta))
 
-        dataset_class.train_list = [['data_batch_1', None],
-                                    ['data_batch_2', None]]
-        dataset_class.test_list = [['test_batch', None]]
-        dataset_class.meta['md5'] = None
+        ori_dataset_class.train_list = [['data_batch_1', None],
+                                        ['data_batch_2', None]]
+        ori_dataset_class.test_list = [['test_batch', None]]
+        ori_dataset_class.meta['md5'] = None
 
     def test_initialize(self):
+        ori_dataset_class = DATASETS.get(self.ORI_DATASET_TYPE)
         dataset_class = DATASETS.get(self.DATASET_TYPE)
 
         # Test overriding metainfo by `metainfo` argument
         cfg = {**self.DEFAULT_ARGS, 'metainfo': {'classes': ('bus', 'car')}}
-        dataset = dataset_class(**cfg)
+        ori_dataset = ori_dataset_class(**cfg)
+        dataset = dataset_class(dataset=ori_dataset, neg_num=1, percent=0.5)
         self.assertEqual(dataset.CLASSES, ('bus', 'car'))
 
         # Test overriding metainfo by `classes` argument
@@ -88,7 +91,3 @@ class Test_CRD_CIFAR10(TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.tmpdir.cleanup()
-
-
-class Test_CRD_CIFAR100(Test_CRD_CIFAR10):
-    DATASET_TYPE = 'CRD_CIFAR100'
