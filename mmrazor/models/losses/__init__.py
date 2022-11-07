@@ -1,5 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from .ab_loss import ABLoss
+from .adaround_loss import AdaRoundLoss
 from .at_loss import ATLoss
 from .crd_loss import CRDLoss
 from .cwd import ChannelWiseDivergence
@@ -19,5 +20,5 @@ __all__ = [
     'ChannelWiseDivergence', 'KLDivergence', 'AngleWiseRKD', 'DistanceWiseRKD',
     'WSLD', 'L2Loss', 'ABLoss', 'DKDLoss', 'KDSoftCELoss', 'ActivationLoss',
     'OnehotLikeLoss', 'InformationEntropyLoss', 'FTLoss', 'ATLoss', 'OFDLoss',
-    'L1Loss', 'FBKDLoss', 'CRDLoss'
+    'L1Loss', 'FBKDLoss', 'CRDLoss', 'AdaRoundLoss'
 ]
