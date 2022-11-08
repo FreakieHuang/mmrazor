@@ -45,10 +45,3 @@ class FXModelWrapper(BaseModel):
         elif isinstance(self.model, BaseClassifier):
             raise NotImplementedError(
                 'TODO: integrate mmcls `tensor` function')
-
-    @property
-    def data_preprocessor(self):
-        return self.model.data_preprocessor
-
-    def train_step(self):
-        pass

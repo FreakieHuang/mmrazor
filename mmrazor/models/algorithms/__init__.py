@@ -6,12 +6,24 @@ from .distill import (DAFLDataFreeDistillation, DataFreeDistillation,
 from .nas import SPOS, AutoSlim, AutoSlimDDP, Darts, DartsDDP, Dsnas, DsnasDDP
 from .pruning import SlimmableNetwork, SlimmableNetworkDDP
 from .pruning.ite_prune_algorithm import ItePruneAlgorithm
-from .quantization import GeneralQuant
+from .quantization import QuantizationAwareTraining
 
 __all__ = [
-    'SingleTeacherDistill', 'BaseAlgorithm', 'FpnTeacherDistill', 'SPOS',
-    'SlimmableNetwork', 'SlimmableNetworkDDP', 'AutoSlim', 'AutoSlimDDP',
-    'Darts', 'DartsDDP', 'SelfDistill', 'DataFreeDistillation',
-    'DAFLDataFreeDistillation', 'OverhaulFeatureDistillation',
-    'ItePruneAlgorithm', 'Dsnas', 'DsnasDDP', 'GeneralQuant'
+    'SingleTeacherDistill',
+    'BaseAlgorithm',
+    'FpnTeacherDistill',
+    'SPOS',
+    'SlimmableNetwork',
+    'SlimmableNetworkDDP',
+    'AutoSlim',
+    'AutoSlimDDP',
+    'Darts',
+    'DartsDDP',
+    'SelfDistill',
+    'DataFreeDistillation',
+    'DAFLDataFreeDistillation',
+    'OverhaulFeatureDistillation',
+    'ItePruneAlgorithm',
+    'Dsnas',
+    'DsnasDDP',
 ]

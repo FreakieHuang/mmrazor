@@ -3,16 +3,14 @@ from typing import Any, Dict, Union
 
 import torch
 import torch.fx
-from mmengine.model import BaseModel
 from torch.fx import Graph
 from torch.fx.graph_module import GraphModule, _copy_attr
 
 
-class MMGraphModule(GraphModule, BaseModel):
+class MMGraphModule(GraphModule):
     _graph_map: Dict[str, Graph] = dict()
 
     def __init__(self, root, graph, class_name) -> None:
-        self.data_preprocessor = root.data_preprocessor
         if isinstance(graph, Graph):
             super().__init__(root, graph, class_name)
 
@@ -20,6 +18,7 @@ class MMGraphModule(GraphModule, BaseModel):
             assert len(graph) > 0, '`graph` should has 1 Graph at least.'
 
             self._custom_init(root, graph, class_name)
+        self.data_preprocessor = root.data_preprocessor
 
     def _custom_init(self, root, graphs, class_name):
         self._graph_map = graphs

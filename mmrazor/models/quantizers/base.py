@@ -5,7 +5,7 @@ from torch.ao.quantization import QConfig
 from torch.ao.quantization.fx import prepare
 from torch.ao.quantization.quantize_fx import _convert_fx, _fuse_fx
 
-from mmrazor.models.task_modules.tracer import CustomTracer
+from mmrazor.models.task_modules.fx import CustomTracer
 from mmrazor.models.utils import (check_is_valid_convert_custom_config_dict,
                                   check_is_valid_prepare_custom_config_dict,
                                   check_is_valid_qconfig_dict,
@@ -16,7 +16,7 @@ from mmrazor.structures.quantization import (CheckArgs, DefalutQconfigs,
 
 
 @MODELS.register_module()
-class CustomQuantizer(BaseModule):
+class BaseQuantizer(BaseModule):
 
     def __init__(self,
                  qconfig=DefalutQconfigs['default'],
