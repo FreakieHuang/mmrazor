@@ -46,9 +46,9 @@ class BaseObserver(UniformQuantizationObserverBase):
                          factory_kwargs, eps)
         factory_kwargs = torch.nn.factory_kwargs(factory_kwargs)
         self.register_buffer('min_val',
-                             torch.tensor(float('inf'), **factory_kwargs))
+                             torch.tensor(-1, **factory_kwargs))
         self.register_buffer('max_val',
-                             torch.tensor(float('-inf'), **factory_kwargs))
+                             torch.tensor(1, **factory_kwargs))
         self.ch_axis = ch_axis
         self.is_pot_scale = is_pot_scale
 

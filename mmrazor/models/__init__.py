@@ -10,3 +10,4 @@ from .observers import *  # noqa: F401,F403
 from .quantizers import *  # noqa: F401,F403
 from .task_modules import *  # noqa: F401,F403
 from .utils import *  # noqa: F401,F403
+from .fx_models import *
