@@ -43,6 +43,8 @@ class MinMaxObserver(BaseObserver):
             y = x.permute(new_axis_list)
             y = torch.flatten(y, start_dim=1)
             min_val_cur, max_val_cur = torch._aminmax(y, 1)
+        self.min_val.resize_(min_val_cur.shape)
+        self.max_val.resize_(max_val_cur.shape)
         min_val = torch.min(self.min_val, min_val_cur)
         max_val = torch.max(self.max_val, max_val_cur)
         self.min_val.copy_(min_val)

@@ -79,7 +79,7 @@ class QATEpochBasedLoop(EpochBasedTrainLoop):
         """Launch training."""
         self.runner.call_hook('before_train')
 
-        self.model.prepare()
+        self.model.prepare('loss')
 
         if self.is_calibrate:
             self.model.state = (1, 0)
@@ -94,6 +94,7 @@ class QATEpochBasedLoop(EpochBasedTrainLoop):
             if (self.runner.val_loop is not None
                     and self._epoch >= self.val_begin
                     and self._epoch % self.val_interval == 0):
+                self.model.prepare('predict')
                 self.runner.val_loop.run()
 
         self.model.convert()
