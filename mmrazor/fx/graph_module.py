@@ -11,7 +11,7 @@ from torch.fx.graph_module import GraphModule, _copy_attr
 
 class MMGraphModule(GraphModule):
     _graph_map: Dict[str, Graph] = dict()
-    mode = None
+    _mode = None
 
     def __init__(self, root, graph, class_name: str = 'MMGraphModule') -> None:
         if isinstance(graph, Graph):
@@ -69,11 +69,19 @@ class MMGraphModule(GraphModule):
         if graph:
             self.graph = graph
             self.recompile()
-            self.mode = mode
+            self._mode = mode
         else:
             raise KeyError(
                 f'`self._graph_map` has no graph named `{mode}`, expecting one of: {list(self._graph_map.keys())}'  # noqa: E501
             )
+
+    @property
+    def mode(self):
+        return self._mode
+
+    @mode.setter
+    def mode(self, mode):
+        self.to_mode(mode)
 
     def _run_forward(self, data: Union[dict, tuple, list],
                      mode: str) -> Union[Dict[str, torch.Tensor], list]:
