@@ -2,12 +2,13 @@
 from typing import Dict, List
 
 import torch
-from torch.fx import GraphModule
 from mmengine.model import BaseModule
 from torch.ao.quantization import QConfig
 from torch.ao.quantization.fx import prepare
 from torch.ao.quantization.quantize_fx import _convert_fx, _fuse_fx
+from torch.fx import GraphModule
 
+from mmrazor.fx.graph_module import MMFusedGraphModule, MMObservedGraphModule
 from mmrazor.models.task_modules.tracer import CustomTracer
 from mmrazor.models.utils import (check_is_valid_convert_custom_config_dict,
                                   check_is_valid_prepare_custom_config_dict,
@@ -16,7 +17,6 @@ from mmrazor.models.utils import (check_is_valid_convert_custom_config_dict,
 from mmrazor.registry import MODELS
 from mmrazor.structures.quantization import (CheckArgs, DefalutQconfigs,
                                              QuantizeScheme, SupportQtypes)
-from mmrazor.fx.graph_module import MMFusedGraphModule, MMObservedGraphModule
 
 
 @MODELS.register_module()
@@ -103,7 +103,8 @@ class CustomQuantizer(BaseModule):
 
         graph_map = graph_module._graph_map
         graph_map[graph_module.mode] = prepared.graph
-        mmprepared = MMObservedGraphModule(prepared, graph_map, preserved_attributes)
+        mmprepared = MMObservedGraphModule(prepared, graph_map,
+                                           preserved_attributes)
         mmprepared.sync_observer_insertion()
         return mmprepared
 
@@ -200,11 +201,14 @@ class CustomQuantizer(BaseModule):
         for mode in graph_module._graph_map.keys():
             graph_module.to_mode(mode)
             _gm = GraphModule(graph_module, graph_module.graph)
-            _fused_single_graph_module = _fuse_fx(_gm, self.is_qat,
-                                    self.prepare_custom_config_dict)
+            _fused_single_graph_module = _fuse_fx(
+                _gm, self.is_qat, self.prepare_custom_config_dict)
             graph_dict[mode] = _fused_single_graph_module.graph
-        preserved_attributes = set(self.prepare_custom_config_dict.get("preserved_attributes", []))
-        fused_graph_module = MMFusedGraphModule(_fused_single_graph_module, graph_dict, preserved_attributes)
+        preserved_attributes = set(
+            self.prepare_custom_config_dict.get('preserved_attributes', []))
+        fused_graph_module = MMFusedGraphModule(_fused_single_graph_module,
+                                                graph_dict,
+                                                preserved_attributes)
         return fused_graph_module
 
     # def fuse_model(self, graph_module):

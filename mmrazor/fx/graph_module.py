@@ -1,12 +1,12 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-from typing import Union, Dict, Any, Set
 import copy
+from typing import Any, Dict, Set, Union
 
 import torch
 import torch.fx
+from torch.ao.quantization.fx.prepare import is_activation_post_process_node
 from torch.fx import Graph
 from torch.fx.graph_module import GraphModule, _copy_attr
-from torch.ao.quantization.fx.prepare import is_activation_post_process_node
 
 
 class MMGraphModule(GraphModule):
@@ -95,10 +95,16 @@ class MMGraphModule(GraphModule):
                             f'list, tuple or dict, but got {type(data)}')
         return results
 
+
 class MMFusedGraphModule(MMGraphModule):
-    def __init__(self, root: Union[torch.nn.Module, Dict[str, Any]], graph: Dict[str, Graph], preserved_attr_names: Set[str]):
+
+    def __init__(self, root: Union[torch.nn.Module, Dict[str, Any]],
+                 graph: Dict[str, Graph], preserved_attr_names: Set[str]):
         self.preserved_attr_names = preserved_attr_names
-        preserved_attrs = {attr: getattr(root, attr) for attr in self.preserved_attr_names if hasattr(root, attr)}
+        preserved_attrs = {
+            attr: getattr(root, attr)
+            for attr in self.preserved_attr_names if hasattr(root, attr)
+        }
         super().__init__(root, graph)
         for attr in preserved_attrs:
             setattr(self, attr, preserved_attrs[attr])
@@ -109,23 +115,24 @@ class MMFusedGraphModule(MMGraphModule):
     def __deepcopy__(self, memo):
         fake_mod = torch.nn.Module()
         fake_mod.__dict__ = copy.deepcopy(self.__dict__)
-        return MMFusedGraphModule(fake_mod, copy.deepcopy(self.graph), copy.deepcopy(self.preserved_attr_names))
+        return MMFusedGraphModule(fake_mod, copy.deepcopy(self.graph),
+                                  copy.deepcopy(self.preserved_attr_names))
+
 
 class MMObservedGraphModule(MMGraphModule):
 
-    def __init__(self, root: Union[torch.nn.Module, Dict[str, Any]], graph: Dict[str, Graph], preserved_attr_names: Set[str]):
+    def __init__(self, root: Union[torch.nn.Module, Dict[str, Any]],
+                 graph: Dict[str, Graph], preserved_attr_names: Set[str]):
         self.preserved_attr_names = set([
-            '_activation_post_process_map',
-            '_activation_post_process_indexes',
-            '_patterns',
-            '_qconfig_map',
-            '_prepare_custom_config_dict',
-            '_equalization_qconfig_map',
-            '_node_name_to_scope',
-            '_qconfig_dict',
-            '_is_qat',
-            '_observed_node_names']).union(preserved_attr_names)
-        preserved_attrs = {attr: getattr(root, attr) for attr in self.preserved_attr_names if hasattr(root, attr)}
+            '_activation_post_process_map', '_activation_post_process_indexes',
+            '_patterns', '_qconfig_map', '_prepare_custom_config_dict',
+            '_equalization_qconfig_map', '_node_name_to_scope',
+            '_qconfig_dict', '_is_qat', '_observed_node_names'
+        ]).union(preserved_attr_names)
+        preserved_attrs = {
+            attr: getattr(root, attr)
+            for attr in self.preserved_attr_names if hasattr(root, attr)
+        }
         super().__init__(root, graph)
         for attr in preserved_attrs:
             setattr(self, attr, preserved_attrs[attr])
@@ -136,14 +143,17 @@ class MMObservedGraphModule(MMGraphModule):
     def __deepcopy__(self, memo):
         fake_mod = torch.nn.Module()
         fake_mod.__dict__ = copy.deepcopy(self.__dict__)
-        return MMObservedGraphModule(fake_mod, copy.deepcopy(self.graph), copy.deepcopy(self.preserved_attr_names))
+        return MMObservedGraphModule(fake_mod, copy.deepcopy(self.graph),
+                                     copy.deepcopy(self.preserved_attr_names))
 
     def sync_observer_insertion(self):
-        "Sync current graph observer insertion with other modes, especially `loss` mode to `predict` mode"
+        """Sync current graph observer insertion with other modes, especially
+        `loss` mode to `predict` mode."""
         for mode in list(self._graph_map.keys()):
             if mode == self.mode:
                 continue
-            self._sync_observer_between_two_graphs(self.graph, self._graph_map[mode])
+            self._sync_observer_between_two_graphs(self.graph,
+                                                   self._graph_map[mode])
 
     def _sync_observer_between_two_graphs(self, graphA, graphB):
         nodeA = graphA._root
@@ -151,13 +161,10 @@ class MMObservedGraphModule(MMGraphModule):
         modules = dict(self.named_modules(remove_duplicate=False))
         while nodeA.name != 'output':
             if is_activation_post_process_node(nodeA, modules):
-                print('observer: ', nodeA)
                 nodeB = nodeB._prev
                 with graphB.inserting_after(nodeB):
-                    nodeB = graphB.create_node(
-                        'call_module', nodeA.name, (nodeB,), {})
+                    nodeB = graphB.create_node('call_module', nodeA.name,
+                                               (nodeB, ), {})
 
-                # nodeA = nodeA._next
-            print('sync: ', nodeA, nodeB)
             nodeA = nodeA._next
             nodeB = nodeB._next

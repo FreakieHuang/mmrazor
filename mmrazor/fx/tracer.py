@@ -7,8 +7,8 @@ from typing import Any, Callable, Dict, Iterator, List, Optional, Type, Union
 import torch
 import torch.nn as nn
 from torch._C import ScriptObject  # type: ignore[attr-defined]
-from torch.fx import GraphModule
 from torch.ao.quantization.quantize_fx import QuantizationTracer
+from torch.fx import GraphModule
 from torch.fx._compatibility import compatibility
 from torch.fx._symbolic_trace import (Graph, _autowrap_check,
                                       _patch_wrapped_functions, _Patcher)
@@ -180,7 +180,8 @@ class CustomTracer(QuantizationTracer):
             self.root = torch.nn.Module()
             fn = root
 
-        tracer_cls: Optional[Type['QuantizationTracer']] = getattr(self, '__class__', None)
+        tracer_cls: Optional[Type['QuantizationTracer']] = getattr(
+            self, '__class__', None)
         self.graph = Graph(tracer_cls=tracer_cls)
 
         # When we encounter a Tensor value that's not a parameter, we look if
