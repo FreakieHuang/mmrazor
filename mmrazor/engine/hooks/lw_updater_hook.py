@@ -3,9 +3,8 @@ from operator import attrgetter
 
 import mmcv
 import torch.nn as nn
-from mmcv.runner import Hook
-
-from mmrazor.registry import HOOKS
+from mmengine.hooks import Hook
+from mmengine.registry import HOOKS
 
 
 class LossWeightUpdaterHook(Hook):
@@ -56,10 +55,24 @@ class LossWeightUpdaterHook(Hook):
             new_lw = self.get_lw(runner, self.base_lw)
             self._set_lw(new_lw)
 
-    def before_train_iter(self, runner):
+    def before_train_iter(self, runner, batch_idx: int, data_batch=None):
         if not self.by_epoch:
             new_lw = self.get_lw(runner, self.base_lw)
             self._set_lw(new_lw)
+
+
+@HOOKS.register_module()
+class ESKDLwUpdaterHook(LossWeightUpdaterHook):
+
+    def __init__(self, loss, stop_epoch, by_epoch=True):
+        super().__init__(loss, by_epoch)
+        self.stop_epoch = stop_epoch
+
+    def get_lw(self, runner, base_lw):
+        progress = runner.epoch if self.by_epoch else runner.iter
+        if self.stop_epoch < progress:
+            return 0.
+        return base_lw
 
 
 @HOOKS.register_module()
