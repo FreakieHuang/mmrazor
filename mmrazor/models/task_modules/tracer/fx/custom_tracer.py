@@ -146,9 +146,9 @@ def _prepare_module_dict(model: torch.nn.Module, fx_graph):
             for special_node in special_nodes:
                 if special_node in node.args or \
                         special_node in node.kwargs.values():
-                    origin_module = getattr(model, special_node.target)
+                    origin_module = _get_attrs(model, special_node.target)
                     setattr(module_dict[special_node.target], node.target,
-                            getattr(origin_module, node.target))
+                            _get_attrs(origin_module, node.target))
 
     return module_dict
 

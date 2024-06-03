@@ -1,4 +1,4 @@
-_base_ = ['mmcls::resnet/resnet18_8xb32_in1k.py']
+_base_ = ['mmpretrain::resnet/resnet18_8xb32_in1k.py']
 
 resnet = _base_.model
 float_checkpoint = 'https://download.openmmlab.com/mmclassification/v0/resnet/resnet18_8xb32_in1k_20210831-fbbb1da6.pth'  # noqa: E501
@@ -18,7 +18,7 @@ model = dict(
     _scope_='mmrazor',
     type='MMArchitectureQuant',
     data_preprocessor=dict(
-        type='mmcls.ClsDataPreprocessor',
+        type='mmpretrain.ClsDataPreprocessor',
         num_classes=1000,
         # RGB format normalization parameters
         mean=[123.675, 116.28, 103.53],
@@ -33,8 +33,8 @@ model = dict(
         tracer=dict(
             type='mmrazor.CustomTracer',
             skipped_methods=[
-                'mmcls.models.heads.ClsHead._get_loss',
-                'mmcls.models.heads.ClsHead._get_predictions'
+                'mmpretrain.models.heads.ClsHead._get_loss',
+                'mmpretrain.models.heads.ClsHead._get_predictions'
             ])))
 
 optim_wrapper = dict(
